@@ -26,6 +26,8 @@ def _clean_tables():
     try:
         conn.execute("DELETE FROM edges")
         conn.execute("DELETE FROM scans")
+        conn.execute("DELETE FROM reservations")
+        conn.execute("UPDATE meta SET value = 0 WHERE key = 'scans_version'")
         conn.commit()
     finally:
         conn.close()

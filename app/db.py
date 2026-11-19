@@ -46,6 +46,23 @@ CREATE TABLE IF NOT EXISTS edges (
     child  TEXT PRIMARY KEY,              -- 任一时点一个子项只能有一个父项
     parent TEXT NOT NULL
 );
+
+-- 断网补录的号段预留：status 流转 active -> released（释放）/ consumed（核销）
+CREATE TABLE IF NOT EXISTS reservations (
+    reservation_id TEXT PRIMARY KEY,
+    start_seq  INTEGER NOT NULL,          -- 号段起始全线序号（含）
+    length     INTEGER NOT NULL CHECK (length BETWEEN 2 AND 16),
+    status     TEXT NOT NULL DEFAULT 'active'
+               CHECK (status IN ('active', 'released', 'consumed')),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+-- 单调版本号：scans 表每次实际变更 +1，供补录入库前检测“有效扫描已变”
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
+);
 """
 
 
@@ -58,6 +75,9 @@ def init_db(path: str | None = None) -> None:
         conn = connect(target)
         try:
             conn.executescript(SCHEMA)
+            conn.execute(
+                "INSERT OR IGNORE INTO meta(key, value) VALUES ('scans_version', 0)"
+            )
             conn.commit()
         finally:
             conn.close()
